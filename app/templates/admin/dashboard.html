@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+    <a href="{{ url_for('main.admin_criar_objeto') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Novo Objeto
+    </a>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card card-welcome">
+        <div class="card-icon">
+            <i class="fas fa-magic"></i>
+        </div>
+        <div class="card-content">
+            <h2>Bem-vindo ao Dynamic CRUD!</h2>
+            <p>Este sistema permite que voc&ecirc; crie objetos personalizados e gere automaticamente todas as telas de CRUD (Criar, Listar, Visualizar, Editar e Deletar).</p>
+            <ol class="steps">
+                <li><strong>Crie um objeto</strong> em "Objetos &gt; Novo Objeto"</li>
+                <li><strong>Defina os campos</strong> que o objeto ter&aacute; (ex: t&iacute;tulo, autor, g&ecirc;nero)</li>
+                <li><strong>Acesse as rotas</strong> geradas automaticamente em /<em>objeto</em>/</li>
+                <li><strong>Gerencie os dados</strong> diretamente pelo sistema!</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="card card-stats">
+        <div class="card-header">
+            <h3><i class="fas fa-chart-bar"></i> Resumo</h3>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number">{{ object_definitions|length }}</div>
+                <div class="stat-label">Objetos Criados</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ stats|sum(attribute='count') }}</div>
+                <div class="stat-label">Registros Totais</div>
+            </div>
+        </div>
+    </div>
+
+    {% for stat in stats %}
+    <div class="card card-object">
+        <div class="card-header">
+            <h3>
+                <i class="fas fa-cube"></i>
+                {{ stat.definition.plural_name }}
+                <span class="badge">{{ stat.count }} registro{% if stat.count != 1 %}s{% endif %}</span>
+            </h3>
+            <div class="card-actions">
+                <a href="{{ dynamic_url('index', stat.definition.slug) }}" class="btn btn-sm btn-outline" title="Listar">
+                    <i class="fas fa-list"></i>
+                </a>
+                <a href="{{ dynamic_url('criar', stat.definition.slug) }}" class="btn btn-sm btn-primary" title="Criar">
+                    <i class="fas fa-plus"></i>
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <p>{{ stat.definition.description or 'Sem descri&ccedil;&atilde;o.' }}</p>
+            <div class="fields-preview">
+                {% for field in stat.definition.fields %}
+                <span class="field-tag">{{ field.label }} <small>({{ field.type }})</small></span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card-footer">
+            <a href="{{ dynamic_url('index', stat.definition.slug) }}" class="btn btn-text">
+                Ver todos <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not stats %}
+    <div class="card card-empty">
+        <div class="empty-state">
+            <i class="fas fa-cube"></i>
+            <h3>Nenhum objeto criado</h3>
+            <p>Crie seu primeiro objeto para come&ccedil;ar a gerenciar dados.</p>
+            <a href="{{ url_for('main.admin_criar_objeto') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Criar Objeto
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

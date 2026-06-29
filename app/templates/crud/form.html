@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}{% if item %}Editar{% else %}Criar{% endif %} {{ obj_def.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>
+        <i class="fas fa-{% if item %}edit{% else %}plus-circle{% endif %}"></i>
+        {% if item %}Editar{% else %}Criar{% endif %} {{ obj_def.name }}
+    </h1>
+    <a href="{{ dynamic_url('index', obj_def.slug) }}" class="btn btn-outline">
+        <i class="fas fa-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="card">
+    <!-- ADICIONADO enctype para upload de arquivos -->
+    <form method="POST" class="form" enctype="multipart/form-data">
+        {% for field in obj_def.fields %}
+        <div class="form-group">
+            <label for="{{ field.name }}">{{ field.label }}</label>
+
+            {% if field.type == 'textarea' %}
+                <textarea id="{{ field.name }}" name="{{ field.name }}" rows="5"
+                    placeholder="Digite {{ field.label|lower }}...">{{ item.get(field.name, '') if item else '' }}</textarea>
+
+            {% elif field.type == 'boolean' %}
+                <label class="toggle-label">
+                    <input type="checkbox" id="{{ field.name }}" name="{{ field.name }}"
+                        {% if item and item.get(field.name) %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-text">{{ field.label }}</span>
+                </label>
+
+            {% elif field.type == 'select' %}
+                <select id="{{ field.name }}" name="{{ field.name }}">
+                    <option value="">Selecione...</option>
+                    {% for opt in field.get('options', []) %}
+                    <option value="{{ opt }}" {% if item and item.get(field.name) == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                </select>
+
+            {% elif field.type == 'number' %}
+                <input type="number" id="{{ field.name }}" name="{{ field.name }}"
+                    value="{{ item.get(field.name, '') if item else '' }}"
+                    placeholder="0.00" step="any">
+
+            {% elif field.type == 'date' %}
+                <input type="date" id="{{ field.name }}" name="{{ field.name }}"
+                    value="{{ item.get(field.name, '') if item else '' }}">
+
+            {% elif field.type == 'email' %}
+                <input type="email" id="{{ field.name }}" name="{{ field.name }}"
+                    value="{{ item.get(field.name, '') if item else '' }}"
+                    placeholder="exemplo@email.com">
+
+            {% elif field.type == 'url' %}
+                <input type="url" id="{{ field.name }}" name="{{ field.name }}"
+                    value="{{ item.get(field.name, '') if item else '' }}"
+                    placeholder="https://...">
+
+            {% elif field.type == 'image' %}
+                <!-- Campo de upload de imagem -->
+                <input type="file" id="{{ field.name }}" name="{{ field.name }}" accept="image/*">
+                {% if item and item.get(field.name) %}
+                <div class="current-image" style="margin-top: 8px;">
+                    <img src="{{ url_for('static', filename=item[field.name]) }}" 
+                         alt="Imagem atual" style="max-width: 200px; border: 1px solid #ddd; padding: 4px;">
+                    <p class="text-muted"><small>Imagem atual. Envie uma nova para substituir.</small></p>
+                </div>
+                {% endif %}
+
+            {% else %}
+                <input type="text" id="{{ field.name }}" name="{{ field.name }}"
+                    value="{{ item.get(field.name, '') if item else '' }}"
+                    placeholder="Digite {{ field.label|lower }}...">
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {% if not obj_def.fields %}
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            Este objeto n&atilde;o possui campos definidos. <a href="{{ url_for('admin_editar_objeto', obj_id=obj_def._id) }}">Adicione campos</a> antes de criar registros.
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <a href="{{ dynamic_url('index', obj_def.slug) }}" class="btn btn-outline">Cancelar</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> {% if item %}Salvar Altera&ccedil;&otilde;es{% else %}Criar {{ obj_def.name }}{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

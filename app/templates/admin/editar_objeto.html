@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Editar {{ obj.name }} - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-edit"></i> Editar Objeto: {{ obj.name }}</h1>
+    <div>
+        <a href="{{ url_for('main.admin_listar_objetos') }}" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <form method="POST" action="{{ url_for('main.admin_editar_objeto', obj_id=obj._id) }}" class="form">
+        <div class="form-section">
+            <h3>Informa&ccedil;&otilde;es B&aacute;sicas</h3>
+
+            <div class="form-group">
+                <label for="name">Nome do Objeto <span class="required">*</span></label>
+                <input type="text" id="name" name="name" value="{{ obj.name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="plural_name">Nome no Plural</label>
+                <input type="text" id="plural_name" name="plural_name" value="{{ obj.plural_name or '' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Descri&ccedil;&atilde;o</label>
+                <textarea id="description" name="description" rows="3">{{ obj.description or '' }}</textarea>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Campos do Objeto</h3>
+            <p class="help-text">
+                Um campo por linha, no formato: <code>nome:tipo:r&oacute;tulo</code>
+            </p>
+
+            <div class="form-group">
+                <label for="fields">Campos <span class="required">*</span></label>
+                <textarea id="fields" name="fields" rows="10" required>{{ fields_text }}</textarea>
+                <div class="field-help">
+                    <h4>Tipos suportados:</h4>
+                    <ul>
+                        <li><code>text</code> - Texto curto</li>
+                        <li><code>textarea</code> - Texto longo</li>
+                        <li><code>number</code> - N&uacute;mero</li>
+                        <li><code>date</code> - Data</li>
+                        <li><code>email</code> - E-mail</li>
+                        <li><code>url</code> - URL</li>
+                        <li><code>boolean</code> - Sim/N&atilde;o</li>
+                        <li><code>select</code> - Sele&ccedil;&atilde;o</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Aten&ccedil;&atilde;o:</strong> Alterar o nome ou os campos n&atilde;o afeta os dados j&aacute; cadastrados.
+            Se remover um campo, os dados existentes desse campo permanecer&atilde;o no banco.
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('main.admin_listar_objetos') }}" class="btn btn-outline">Cancelar</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Salvar Altera&ccedil;&otilde;es
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

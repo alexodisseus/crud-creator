@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}{{ obj_def.plural_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+
+    <h1>
+        <i class="fas fa-table"></i> {{ obj_def.plural_name }}
+        {% if search %}
+        <small>- Resultados para "{{ search }}"</small>
+        {% endif %}
+    </h1>
+    <a href="{{ dynamic_url('criar', obj_def.slug) }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Novo {{ obj_def.name }}
+    </a>
+</div>
+
+<div class="card">
+    <div class="toolbar">
+        <form method="GET" action="{{ dynamic_url('index', obj_def.slug) }}" class="search-form">
+            <div class="input-group">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" value="{{ search }}" placeholder="Buscar em {{ obj_def.plural_name }}...">
+                <button type="submit" class="btn btn-outline">Buscar</button>
+                {% if search %}
+                <a href="{{ dynamic_url('index', obj_def.slug) }}" class="btn btn-text">Limpar</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    {% if items %}
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    {% for field in obj_def.fields %}
+                    <th>{{ field.label }}</th>
+                    {% endfor %}
+                    <th class="actions-col">A&ccedil;&otilde;es</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    {% for field in obj_def.fields %}
+                    <td>
+                        {% set val = item.get(field.name, '') %}
+                        {% if field.type == 'boolean' %}
+                            {% if val %}
+                            <span class="badge badge-success"><i class="fas fa-check"></i> Sim</span>
+                            {% else %}
+                            <span class="badge badge-secondary"><i class="fas fa-times"></i> N&atilde;o</span>
+                            {% endif %}
+                        {% elif field.type == 'textarea' %}
+                            {{ val[:80] }}{% if val|length > 80 %}...{% endif %}
+                        {% elif field.type == 'url' and val %}
+                            <a href="{{ val }}" target="_blank">{{ val[:40] }}{% if val|length > 40 %}...{% endif %}</a>
+                            
+                        {% elif field.type == 'email' and val %}
+                            <a href="mailto:{{ val }}">{{ val }}</a>
+
+                        {% elif field.type == 'image' and val %}
+                            <img 
+                                src="{{ url_for('static', filename=val) }}" 
+                                alt="{{ field.label }}"
+                                class="img-thumbnail"
+                            >
+
+                        {% elif field.type == 'number' and val is not none %}
+                            {{ '%.2f'|format(val) if val % 1 != 0 else '%d'|format(val) }}
+
+                        {% else %}
+                            {{ val or '-' }}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="actions-col">
+                        <div class="actions">
+                            <a href="{{ dynamic_url('ver', obj_def.slug, item_id=item._id) }}" class="btn btn-sm btn-outline" title="Visualizar">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{{ dynamic_url('editar', obj_def.slug, item_id=item._id) }}" class="btn btn-sm btn-primary" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{{ dynamic_url('deletar', obj_def.slug, item_id=item._id) }}" class="btn btn-sm btn-danger" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ dynamic_url('index', obj_def.slug, page=page-1, q=search) }}" class="btn btn-outline">
+            <i class="fas fa-chevron-left"></i> Anterior
+        </a>
+        {% endif %}
+
+        <span class="page-info">P&aacute;gina {{ page }} de {{ total_pages }} ({{ total }} registros)</span>
+
+        {% if page < total_pages %}
+        <a href="{{ dynamic_url('index', obj_def.slug, page=page+1, q=search) }}" class="btn btn-outline">
+            Pr&oacute;xima <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <h3>Nenhum registro encontrado</h3>
+        {% if search %}
+        <p>Nenhum resultado para "{{ search }}".</p>
+        <a href="{{ dynamic_url('index', obj_def.slug) }}" class="btn btn-outline">Ver todos</a>
+        {% else %}
+        <p>Comece adicionando um novo {{ obj_def.name }}.</p>
+        <a href="{{ dynamic_url('criar', obj_def.slug) }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Criar {{ obj_def.name }}
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

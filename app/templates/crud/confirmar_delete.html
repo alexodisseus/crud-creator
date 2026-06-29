@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Excluir {{ obj_def.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-trash-alt"></i> Excluir {{ obj_def.name }}</h1>
+</div>
+
+<div class="card card-delete">
+    <div class="delete-icon">
+        <i class="fas fa-exclamation-triangle"></i>
+    </div>
+    <h2>Tem certeza que deseja excluir?</h2>
+    <p>Esta a&ccedil;&atilde;o n&atilde;o pode ser desfeita. Os seguintes dados ser&atilde;o removidos:</p>
+
+    <div class="delete-preview">
+        {% for field in obj_def.fields %}
+        <div class="delete-row">
+            <span class="delete-label">{{ field.label }}:</span>
+            <span class="delete-value">
+                {% set val = item.get(field.name) %}
+                {% if field.type == 'boolean' %}
+                    {{ 'Sim' if val else 'N&atilde;o' }}
+                {% elif field.type == 'textarea' and val %}
+                    {{ val[:100] }}{% if val|length > 100 %}...{% endif %}
+                {% else %}
+                    {{ val or '-' }}
+                {% endif %}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form method="POST" class="delete-actions">
+        <a href="{{ dynamic_url('index', obj_def.slug) }}" class="btn btn-outline btn-lg">
+            <i class="fas fa-arrow-left"></i> Cancelar
+        </a>
+        <button type="submit" class="btn btn-danger btn-lg">
+            <i class="fas fa-trash"></i> Sim, Excluir
+        </button>
+    </form>
+</div>
+{% endblock %}

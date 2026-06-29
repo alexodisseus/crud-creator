@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Criar Objeto - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-plus-circle"></i> Criar Novo Objeto</h1>
+    <a href="{{ url_for('main.admin_listar_objetos') }}" class="btn btn-outline">
+        <i class="fas fa-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="card">
+    <form method="POST" action="{{ url_for('main.admin_criar_objeto') }}" class="form">
+        <div class="form-section">
+            <h3>Informa&ccedil;&otilde;es B&aacute;sicas</h3>
+
+            <div class="form-group">
+                <label for="name">Nome do Objeto <span class="required">*</span></label>
+                <input type="text" id="name" name="name" required placeholder="Ex: Livro, Filme, Produto, Cliente...">
+                <small>Este nome ser&aacute; usado para gerar o slug e as rotas automaticamente.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="plural_name">Nome no Plural</label>
+                <input type="text" id="plural_name" name="plural_name" placeholder="Ex: Livros, Filmes, Produtos...">
+                <small>Opcional. Ser&aacute; usado nos t&iacute;tulos das p&aacute;ginas.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Descri&ccedil;&atilde;o</label>
+                <textarea id="description" name="description" rows="3" placeholder="Uma breve descri&ccedil;&atilde;o do objeto..."></textarea>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Campos do Objeto</h3>
+            <p class="help-text">
+                Defina os campos que cada registro deste objeto ter&aacute;.
+                Um campo por linha, no formato: <code>nome:tipo:r&oacute;tulo</code>
+            </p>
+
+            <div class="form-group">
+                <label for="fields">Campos <span class="required">*</span></label>
+                <textarea id="fields" name="fields" rows="10" required placeholder="titulo:text:Titulo&#10;autor:text:Autor&#10;genero:text:Genero&#10;preco:number:Preco&#10;descricao:textarea:Descricao&#10;publicacao:date:Data de Publicacao"></textarea>
+                <div class="field-help">
+                    <h4>Tipos suportados:</h4>
+                    <ul>
+                        <li><code>text</code> - Texto curto (input)</li>
+                        <li><code>textarea</code> - Texto longo (&aacute;rea de texto)</li>
+                        <li><code>number</code> - N&uacute;mero</li>
+                        <li><code>date</code> - Data</li>
+                        <li><code>email</code> - E-mail</li>
+                        <li><code>url</code> - URL</li>
+                        <li><code>boolean</code> - Sim/N&atilde;o (checkbox)</li>
+                        <li><code>select</code> - Sele&ccedil;&atilde;o (dropdown)</li>
+                    </ul>
+                    <h4>Exemplos:</h4>
+                    <pre>nome:text:Nome
+preco:number:Preco
+descricao:textarea:Descricao
+data_nascimento:date:Data de Nascimento
+email:email:E-mail
+site:url:Website
+ativo:boolean:Ativo</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('main.admin_listar_objetos') }}" class="btn btn-outline">Cancelar</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Criar Objeto
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
