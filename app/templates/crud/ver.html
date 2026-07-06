@@ -36,52 +36,58 @@
         </div>
     </div>
 
-    <div class="detail-body">
-        {% for field in obj_def.fields %}
-        <div class="detail-row">
-            <div class="detail-label">{{ field.label }}</div>
-            <div class="detail-value">
-                {% set val = item.get(field.name) %}
-                {% if field.type == 'boolean' %}
-                    {% if val %}
-                    <span class="badge badge-success"><i class="fas fa-check-circle"></i> Sim</span>
-                    {% else %}
-                    <span class="badge badge-secondary"><i class="fas fa-times-circle"></i> N&atilde;o</span>
-                    {% endif %}
-                {% elif field.type == 'textarea' and val %}
-                    <div class="text-block">{{ val }}</div>
-                {% elif field.type == 'url' and val %}
-                    <a href="{{ val }}" target="_blank" rel="noopener noreferrer">
-                        <i class="fas fa-external-link-alt"></i> {{ val }}
-                    </a>
-                {% elif field.type == 'email' and val %}
-                    <a href="mailto:{{ val }}">
-                        <i class="fas fa-envelope"></i> {{ val }}
-                    </a>
+<div class="detail-body">
+    {% for field in obj_def.fields %}
+    <div class="detail-row">
+        <div class="detail-label">{{ field.label }}</div>
+        <div class="detail-value">
+            {% set val = item.get(field.name) %}
 
-                {% elif field.type == 'image' and val %}
-                    <img 
-                        src="{{ url_for('static', filename=val) }}"
-                        alt="{{ field.label }}"
-                        class="detail-image"
-                    >
+            {% if field.type == 'password' %}
+                ********
 
-                {% elif field.type == 'number' and val is not none %}
-                    <span class="number-value">
-                        {{ '%.2f'|format(val) if val % 1 != 0 else '%d'|format(val) }}
-                    </span>
-
-                {% elif val %}
-                    {{ val }}
-
+            {% elif field.type == 'boolean' %}
+                {% if val %}
+                <span class="badge badge-success"><i class="fas fa-check-circle"></i> Sim</span>
                 {% else %}
-                    <em class="empty-value">Não informado</em>
+                <span class="badge badge-secondary"><i class="fas fa-times-circle"></i> N&atilde;o</span>
                 {% endif %}
-            </div>
-        </div>
-        {% endfor %}
-    </div>
 
+            {% elif field.type == 'textarea' and val %}
+                <div class="text-block">{{ val }}</div>
+
+            {% elif field.type == 'url' and val %}
+                <a href="{{ val }}" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-external-link-alt"></i> {{ val }}
+                </a>
+
+            {% elif field.type == 'email' and val %}
+                <a href="mailto:{{ val }}">
+                    <i class="fas fa-envelope"></i> {{ val }}
+                </a>
+
+            {% elif field.type == 'image' and val %}
+                <img
+                    src="{{ url_for('static', filename=val) }}"
+                    alt="{{ field.label }}"
+                    class="detail-image"
+                >
+
+            {% elif field.type == 'number' and val is not none %}
+                <span class="number-value">
+                    {{ '%.2f'|format(val) if val % 1 != 0 else '%d'|format(val) }}
+                </span>
+
+            {% elif val %}
+                {{ val }}
+
+            {% else %}
+                <em class="empty-value">Não informado</em>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
     <div class="detail-footer">
         <div class="meta-info">
             {% if item.get('created_at') %}

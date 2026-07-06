@@ -9,23 +9,99 @@ from flask import (
 
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
+from datetime import datetime
 
 from model import *
-
-from flask import jsonify, request
-from bson.objectid import ObjectId
-from bson.errors import InvalidId
-import json
-
+from utils.security import hash_password, should_exclude_from_display
 
 main_bp = Blueprint(
     "main",
     __name__
 )
 
+# ============================================================================
+# FUNÇÕES AUXILIARES
+# ============================================================================
 
+def build_document(fields, form_data, files_data, existing_item=None):
+    """
+    Constrói o documento a ser salvo no MongoDB.
+    Modificado para tratar campos de senha com hashing.
+    """
+    data = {}
+    
+    for field in fields:
+        field_name = field['name']
+        field_type = field.get('type', 'text')
+        
+        # Tratamento especial para campos de senha
+        if field_type == 'password':
+            password = form_data.get(field_name, '').strip()
+            if password:  # Só faz hash se a senha não estiver vazia
+                data[field_name] = hash_password(password)
+            elif existing_item and field_name in existing_item:
+                # Se não forneceu senha e está editando, mantém a existente
+                data[field_name] = existing_item.get(field_name)
+            else:
+                data[field_name] = None
+        else:
+            # Para outros campos, mantém o comportamento padrão
+            value = form_data.get(field_name, '')
+            
+            # Tratamento especial para campos de imagem
+            if field_type == 'image' and field_name in files_data:
+                file = files_data[field_name]
+                if file and file.filename:
+                    # Salva a imagem (lógica existente)
+                    data[field_name] = save_image(file)
+                elif existing_item and field_name in existing_item:
+                    data[field_name] = existing_item.get(field_name)
+                else:
+                    data[field_name] = value
+            else:
+                data[field_name] = value
+    
+    return data
 
+def get_display_fields(fields):
+    """Retorna apenas os campos que devem ser exibidos (exclui senhas)."""
+    return [f for f in fields if not should_exclude_from_display(f)]
 
+def get_safe_item(item, fields):
+    """
+    Retorna uma cópia do item com campos sensíveis removidos para exibição.
+    """
+    if not item:
+        return {}
+    
+    safe_item = item.copy()
+    for field in fields:
+        if should_exclude_from_display(field):
+            safe_item.pop(field['name'], None)
+    return safe_item
+
+def save_image(file):
+    """Salva uma imagem e retorna o caminho."""
+    from werkzeug.utils import secure_filename
+    import os
+    import uuid
+    
+    if not file or not file.filename:
+        return None
+    
+    original_ext = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"{uuid.uuid4().hex}.{original_ext}"
+    
+    from flask import current_app
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    file_path = os.path.join(upload_folder, filename)
+    file.save(file_path)
+    
+    return f"uploads/{filename}"
+
+# ============================================================================
+# ROTAS ADMIN
+# ============================================================================
 
 @main_bp.route('/admin')
 def admin_dashboard():
@@ -40,13 +116,11 @@ def admin_dashboard():
         })
     return render_template('admin/dashboard.html', stats=stats)
 
-
 @main_bp.route('/admin/objetos')
 def admin_listar_objetos():
     """Lista todos os tipos de objetos cadastrados."""
     objects = get_all_object_definitions()
     return render_template('admin/listar_objetos.html', objects=objects)
-
 
 @main_bp.route('/admin/objetos/criar', methods=['GET', 'POST'])
 def admin_criar_objeto():
@@ -108,7 +182,6 @@ def admin_criar_objeto():
         return redirect(url_for('main.admin_listar_objetos'))
 
     return render_template('admin/criar_objeto.html')
-
 
 @main_bp.route('/admin/objetos/editar/<obj_id>', methods=['GET', 'POST'])
 def admin_editar_objeto(obj_id):
@@ -172,7 +245,6 @@ def admin_editar_objeto(obj_id):
 
     return render_template('admin/editar_objeto.html', obj=obj_def, fields_text=fields_text)
 
-
 @main_bp.route('/admin/objetos/deletar/<obj_id>', methods=['POST'])
 def admin_deletar_objeto(obj_id):
     """Remove um tipo de objeto e todos os seus dados."""
@@ -189,11 +261,9 @@ def admin_deletar_objeto(obj_id):
     flash(f'Objeto "{obj_def["name"]}" e todos os seus dados foram removidos.', 'success')
     return redirect(url_for('main.admin_listar_objetos'))
 
-
 # ============================================================================
-# ROTAS CRUD DINÂMICAS GENÉRICAS
+# ROTAS CRUD DINÂMICAS GENÉRICAS (APENAS UMA VEZ)
 # ============================================================================
-# Todas as rotas de CRUD usam <slug> para identificar o tipo de objeto
 
 @main_bp.route('/<slug>/index')
 def dynamic_index(slug):
@@ -207,6 +277,7 @@ def dynamic_index(slug):
     query = {}
     if search:
         or_conditions = []
+        # Não busca em campos de senha
         for field in obj_def.get('fields', []):
             if field['type'] in ('text', 'textarea', 'email', 'url'):
                 or_conditions.append({
@@ -221,16 +292,21 @@ def dynamic_index(slug):
                  .skip((page - 1) * per_page)
                  .limit(per_page))
 
+    # Remove campos de senha dos itens para exibição
+    safe_items = []
+    for item in items:
+        safe_item = get_safe_item(item, obj_def.get('fields', []))
+        safe_items.append(safe_item)
+
     total_pages = (total + per_page - 1) // per_page
 
     return render_template('crud/index.html',
                            obj_def=obj_def,
-                           items=items,
+                           items=safe_items,
                            page=page,
                            total_pages=total_pages,
                            total=total,
                            search=search)
-
 
 @main_bp.route('/<slug>/ver/<item_id>')
 def dynamic_ver(slug, item_id):
@@ -247,18 +323,29 @@ def dynamic_ver(slug, item_id):
         flash(f'{obj_def["name"]} não encontrado.', 'error')
         return redirect(dynamic_url('index', slug))
 
-    return render_template('crud/ver.html', obj_def=obj_def, item=item)
+    # Remove campos de senha para exibição
+    safe_item = get_safe_item(item, obj_def.get('fields', []))
+    display_fields = get_display_fields(obj_def.get('fields', []))
 
-
+    return render_template('crud/ver.html', 
+                           obj_def=obj_def, 
+                           item=safe_item,
+                           display_fields=display_fields)
 
 @main_bp.route('/<slug>/criar', methods=['GET', 'POST'])
 def dynamic_criar(slug):
     """Cria um novo registro."""
     obj_def = get_obj_def_or_404(slug)
+    display_fields = get_display_fields(obj_def.get('fields', []))
 
     if request.method == 'POST':
-        # Constrói o documento com tratamento de campos especiais (ex.: imagens)
-        data = build_document(obj_def.get('fields', []), request.form, request.files)
+        # Constrói o documento com tratamento de senhas
+        data = build_document(
+            obj_def.get('fields', []), 
+            request.form, 
+            request.files,
+            existing_item=None
+        )
 
         data['created_at'] = datetime.utcnow()
         data['updated_at'] = data['created_at']
@@ -267,15 +354,17 @@ def dynamic_criar(slug):
         flash(f'{obj_def["name"]} criado com sucesso!', 'success')
         return redirect(dynamic_url('ver', slug, item_id=str(result.inserted_id)))
 
-    return render_template('crud/form.html', obj_def=obj_def, item=None)
-
-
-    
+    return render_template('crud/form.html', 
+                          obj_def=obj_def, 
+                          item=None,
+                          display_fields=display_fields)
 
 @main_bp.route('/<slug>/editar/<item_id>', methods=['GET', 'POST'])
 def dynamic_editar(slug, item_id):
     """Edita um registro existente."""
     obj_def = get_obj_def_or_404(slug)
+    display_fields = get_display_fields(obj_def.get('fields', []))
+    
     try:
         oid = ObjectId(item_id)
     except InvalidId:
@@ -289,13 +378,13 @@ def dynamic_editar(slug, item_id):
         return redirect(dynamic_url('index', slug))
 
     if request.method == 'POST':
-        # Constrói o documento considerando campos especiais (imagens)
-        data = build_document(obj_def.get('fields', []), request.form, request.files)
-
-        # Preserva imagens existentes quando nenhum arquivo é enviado
-        for field in obj_def.get('fields', []):
-            if field['type'] == 'image' and not data[field['name']]:
-                data[field['name']] = item.get(field['name'])
+        # Constrói o documento considerando campos especiais e preservando existentes
+        data = build_document(
+            obj_def.get('fields', []), 
+            request.form, 
+            request.files,
+            existing_item=item
+        )
 
         data['updated_at'] = datetime.utcnow()
         collection.update_one({'_id': oid}, {'$set': data})
@@ -303,8 +392,14 @@ def dynamic_editar(slug, item_id):
         flash(f'{obj_def["name"]} atualizado com sucesso!', 'success')
         return redirect(dynamic_url('ver', slug, item_id=item_id))
 
-    return render_template('crud/form.html', obj_def=obj_def, item=item)
+    safe_item = get_safe_item(item, obj_def.get('fields', []))
 
+    return render_template(
+        'crud/form.html',
+        obj_def=obj_def,
+        item=safe_item,
+        display_fields=display_fields
+    )
 
 @main_bp.route('/<slug>/deletar/<item_id>', methods=['GET', 'POST'])
 def dynamic_deletar(slug, item_id):
@@ -327,18 +422,21 @@ def dynamic_deletar(slug, item_id):
         flash(f'{obj_def["name"]} removido com sucesso!', 'success')
         return redirect(dynamic_url('index', slug))
 
-    return render_template('crud/confirmar_delete.html', obj_def=obj_def, item=item)
+    # Remove campos de senha para exibição
+    safe_item = get_safe_item(item, obj_def.get('fields', []))
 
+    return render_template('crud/confirmar_delete.html', 
+                          obj_def=obj_def, 
+                          item=safe_item)
 
 # ============================================================================
-# ROTA HOME - REDIRECIONA PARA ADMIN
+# ROTA HOME
 # ============================================================================
 
 @main_bp.route('/')
 def home():
     """Página inicial redireciona para o admin."""
     return redirect(url_for('main.admin_dashboard'))
-
 
 # ============================================================================
 # CONTEXTO GLOBAL PARA TEMPLATES
@@ -349,358 +447,7 @@ def inject_globals():
     """Injeta variáveis globais em todos os templates."""
     return {
         'object_definitions': get_all_object_definitions(),
-        'dynamic_url': dynamic_url
+        'dynamic_url': dynamic_url,
+        'get_display_fields': get_display_fields,
+        'get_safe_item': get_safe_item
     }
-
-
-# ============================================================================
-# MAIN
-# ============================================================================
-
-
-
-
-
-
-
-# ... (seu código existente) ...
-
-# ============================================================================
-# API RESTful DINÂMICA
-# ============================================================================
-
-class MongoJSONEncoder(json.JSONEncoder):
-    """Encoder personalizado para serializar objetos MongoDB/Bson."""
-    def default(self, obj):
-        if isinstance(obj, ObjectId):
-            return str(obj)
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return super().default(obj)
-
-# Configure o Flask para usar o encoder personalizado
-# Adicione isso na configuração do seu app Flask:
-# app.json_encoder = MongoJSONEncoder
-
-@main_bp.route('/api/<slug>')
-def api_index(slug):
-    """
-    GET /api/<slug>
-    Lista todos os registros com suporte a paginação e busca.
-    
-    Query params:
-    - page: número da página (default: 1)
-    - per_page: registros por página (default: 20)
-    - q: termo de busca
-    - sort: campo para ordenação (default: created_at)
-    - order: asc ou desc (default: desc)
-    - fields: campos específicos separados por vírgula (ex: titulo,autor)
-    """
-    obj_def = get_obj_def_or_404(slug)
-    collection = get_data_collection(slug)
-    
-    # Parâmetros de paginação
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-    per_page = min(per_page, 100)  # Limita a 100 registros por página
-    
-    # Parâmetro de busca
-    search = request.args.get('q', '')
-    
-    # Parâmetros de ordenação
-    sort_field = request.args.get('sort', 'created_at')
-    sort_order = request.args.get('order', 'desc')
-    
-    # Campos específicos (projeção)
-    fields_param = request.args.get('fields', '')
-    
-    # Constrói a query
-    query = {}
-    if search:
-        or_conditions = []
-        for field in obj_def.get('fields', []):
-            if field['type'] in ('text', 'textarea', 'email', 'url'):
-                or_conditions.append({
-                    field['name']: {'$regex': search, '$options': 'i'}
-                })
-        if or_conditions:
-            query['$or'] = or_conditions
-    
-    # Constrói a projeção
-    projection = None
-    if fields_param:
-        fields_list = [f.strip() for f in fields_param.split(',')]
-        projection = {field: 1 for field in fields_list}
-        projection['_id'] = 1  # Sempre inclui o _id
-    
-    # Constrói a ordenação
-    sort_direction = DESCENDING if sort_order.lower() == 'desc' else ASCENDING
-    
-    # Executa a query
-    cursor = collection.find(query, projection)
-    cursor = cursor.sort(sort_field, sort_direction)
-    
-    # Conta total de registros
-    total = collection.count_documents(query)
-    
-    # Paginação
-    skip = (page - 1) * per_page
-    cursor = cursor.skip(skip).limit(per_page)
-    
-    # Converte para lista
-    items = list(cursor)
-    
-    # Prepara resposta
-    response = {
-        'success': True,
-        'data': items,
-        'pagination': {
-            'page': page,
-            'per_page': per_page,
-            'total': total,
-            'total_pages': (total + per_page - 1) // per_page if total > 0 else 0,
-            'has_next': (page * per_page) < total,
-            'has_prev': page > 1
-        }
-    }
-    
-    return jsonify(response)
-
-
-@main_bp.route('/api/<slug>/<item_id>')
-def api_show(slug, item_id):
-    """
-    GET /api/<slug>/<item_id>
-    Retorna um registro específico.
-    """
-    obj_def = get_obj_def_or_404(slug)
-    
-    try:
-        oid = ObjectId(item_id)
-    except InvalidId:
-        return jsonify({
-            'success': False,
-            'error': 'ID inválido',
-            'message': f'O ID fornecido ({item_id}) não é um ObjectId válido.'
-        }), 400
-    
-    item = get_data_collection(slug).find_one({'_id': oid})
-    
-    if not item:
-        return jsonify({
-            'success': False,
-            'error': 'Registro não encontrado',
-            'message': f'{obj_def["name"]} com ID {item_id} não encontrado.'
-        }), 404
-    
-    return jsonify({
-        'success': True,
-        'data': item
-    })
-
-
-@main_bp.route('/api/<slug>', methods=['POST'])
-def api_create(slug):
-    """
-    POST /api/<slug>
-    Cria um novo registro.
-    
-    Body: JSON com os dados do registro
-    """
-    obj_def = get_obj_def_or_404(slug)
-    
-    # Verifica se o Content-Type é JSON
-    if not request.is_json:
-        return jsonify({
-            'success': False,
-            'error': 'Content-Type inválido',
-            'message': 'A requisição deve ter Content-Type: application/json'
-        }), 400
-    
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({
-            'success': False,
-            'error': 'Dados inválidos',
-            'message': 'O corpo da requisição está vazio ou não é um JSON válido.'
-        }), 400
-    
-    # Valida campos obrigatórios (se definido no objeto)
-    # Por enquanto, aceita qualquer campo
-    
-    # Adiciona timestamps
-    data['created_at'] = datetime.utcnow()
-    data['updated_at'] = data['created_at']
-    
-    # Insere no banco
-    result = get_data_collection(slug).insert_one(data)
-    
-    # Busca o registro inserido
-    new_item = get_data_collection(slug).find_one({'_id': result.inserted_id})
-    
-    return jsonify({
-        'success': True,
-        'message': f'{obj_def["name"]} criado com sucesso!',
-        'data': new_item
-    }), 201
-
-
-@main_bp.route('/api/<slug>/<item_id>', methods=['PUT', 'PATCH'])
-def api_update(slug, item_id):
-    """
-    PUT/PATCH /api/<slug>/<item_id>
-    Atualiza um registro existente.
-    """
-    obj_def = get_obj_def_or_404(slug)
-    
-    try:
-        oid = ObjectId(item_id)
-    except InvalidId:
-        return jsonify({
-            'success': False,
-            'error': 'ID inválido',
-            'message': f'O ID fornecido ({item_id}) não é um ObjectId válido.'
-        }), 400
-    
-    # Verifica se o registro existe
-    existing = get_data_collection(slug).find_one({'_id': oid})
-    if not existing:
-        return jsonify({
-            'success': False,
-            'error': 'Registro não encontrado',
-            'message': f'{obj_def["name"]} com ID {item_id} não encontrado.'
-        }), 404
-    
-    # Verifica se o Content-Type é JSON
-    if not request.is_json:
-        return jsonify({
-            'success': False,
-            'error': 'Content-Type inválido',
-            'message': 'A requisição deve ter Content-Type: application/json'
-        }), 400
-    
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({
-            'success': False,
-            'error': 'Dados inválidos',
-            'message': 'O corpo da requisição está vazio ou não é um JSON válido.'
-        }), 400
-    
-    # Remove campos que não devem ser atualizados diretamente
-    data.pop('_id', None)
-    data.pop('created_at', None)
-    
-    # Atualiza timestamp
-    data['updated_at'] = datetime.utcnow()
-    
-    # Atualiza no banco
-    get_data_collection(slug).update_one(
-        {'_id': oid},
-        {'$set': data}
-    )
-    
-    # Busca o registro atualizado
-    updated_item = get_data_collection(slug).find_one({'_id': oid})
-    
-    return jsonify({
-        'success': True,
-        'message': f'{obj_def["name"]} atualizado com sucesso!',
-        'data': updated_item
-    })
-
-
-@main_bp.route('/api/<slug>/<item_id>', methods=['DELETE'])
-def api_delete(slug, item_id):
-    """
-    DELETE /api/<slug>/<item_id>
-    Remove um registro.
-    """
-    obj_def = get_obj_def_or_404(slug)
-    
-    try:
-        oid = ObjectId(item_id)
-    except InvalidId:
-        return jsonify({
-            'success': False,
-            'error': 'ID inválido',
-            'message': f'O ID fornecido ({item_id}) não é um ObjectId válido.'
-        }), 400
-    
-    # Verifica se o registro existe
-    existing = get_data_collection(slug).find_one({'_id': oid})
-    if not existing:
-        return jsonify({
-            'success': False,
-            'error': 'Registro não encontrado',
-            'message': f'{obj_def["name"]} com ID {item_id} não encontrado.'
-        }), 404
-    
-    # Remove o registro
-    get_data_collection(slug).delete_one({'_id': oid})
-    
-    return jsonify({
-        'success': True,
-        'message': f'{obj_def["name"]} removido com sucesso!'
-    })
-
-
-@main_bp.route('/api/<slug>/batch', methods=['POST'])
-def api_batch_delete(slug):
-    """
-    POST /api/<slug>/batch
-    Operações em lote (ex: deletar múltiplos registros).
-    
-    Body: 
-    {
-        "action": "delete",
-        "ids": ["id1", "id2", ...]
-    }
-    """
-    obj_def = get_obj_def_or_404(slug)
-    
-    if not request.is_json:
-        return jsonify({
-            'success': False,
-            'error': 'Content-Type inválido',
-            'message': 'A requisição deve ter Content-Type: application/json'
-        }), 400
-    
-    data = request.get_json()
-    action = data.get('action')
-    
-    if action == 'delete':
-        ids = data.get('ids', [])
-        if not ids:
-            return jsonify({
-                'success': False,
-                'error': 'IDs não fornecidos',
-                'message': 'Forneça uma lista de IDs para deletar.'
-            }), 400
-        
-        # Converte strings para ObjectId
-        try:
-            object_ids = [ObjectId(id_str) for id_str in ids]
-        except InvalidId as e:
-            return jsonify({
-                'success': False,
-                'error': 'IDs inválidos',
-                'message': f'Um ou mais IDs são inválidos: {str(e)}'
-            }), 400
-        
-        # Deleta os registros
-        result = get_data_collection(slug).delete_many({'_id': {'$in': object_ids}})
-        
-        return jsonify({
-            'success': True,
-            'message': f'{result.deleted_count} registro(s) removido(s) com sucesso!',
-            'deleted_count': result.deleted_count
-        })
-    
-    return jsonify({
-        'success': False,
-        'error': 'Ação não suportada',
-        'message': f'Ação "{action}" não é suportada. Use "delete".'
-    }), 400

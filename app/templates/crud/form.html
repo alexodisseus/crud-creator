@@ -59,6 +59,17 @@
                     value="{{ item.get(field.name, '') if item else '' }}"
                     placeholder="https://...">
 
+            {% elif field.type == 'password' %}
+                <input type="password"
+                       id="{{ field.name }}"
+                       name="{{ field.name }}"
+                       {% if item %}
+                           placeholder="Mantenha atual"
+                       {% else %}
+                           placeholder="Digite {{ field.label|lower }}..."
+                           required
+                       {% endif %}>
+
             {% elif field.type == 'image' %}
                 <!-- Campo de upload de imagem -->
                 <input type="file" id="{{ field.name }}" name="{{ field.name }}" accept="image/*">

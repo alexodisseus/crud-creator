@@ -1,6 +1,7 @@
 from flask import Flask
 from config import Config
 from routes import main_bp
+from api import api_bp
 from model import init_db
 import os
 import json
@@ -35,6 +36,7 @@ def create_app():
 
     # Registra blueprint
     app.register_blueprint(main_bp)
+    app.register_blueprint(api_bp)
 
     return app
 
