@@ -116,6 +116,8 @@ def admin_dashboard():
         })
     return render_template('admin/dashboard.html', stats=stats)
 
+
+
 @main_bp.route('/admin/objetos')
 def admin_listar_objetos():
     """Lista todos os tipos de objetos cadastrados."""
@@ -436,7 +438,7 @@ def dynamic_deletar(slug, item_id):
 @main_bp.route('/')
 def home():
     """Página inicial redireciona para o admin."""
-    return redirect(url_for('main.admin_dashboard'))
+    return redirect(url_for('cadastro_ecc.home'))
 
 # ============================================================================
 # CONTEXTO GLOBAL PARA TEMPLATES
@@ -451,3 +453,16 @@ def inject_globals():
         'get_display_fields': get_display_fields,
         'get_safe_item': get_safe_item
     }
+
+
+
+
+ecc_bp = Blueprint(
+    "cadastro_ecc",
+    __name__,
+    url_prefix='/cadastro_ecc'
+)
+@ecc_bp.route('/asd')
+def home():
+    
+    return "asd asd asd"

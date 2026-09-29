@@ -155,7 +155,7 @@ logs/
 *.log
 
 # Config files with sensitive data
-config.py
+#config.py
 .env.local
 .env.*.local
 secrets.json
