@@ -435,10 +435,13 @@ def dynamic_deletar(slug, item_id):
 # ROTA HOME
 # ============================================================================
 
+
 @main_bp.route('/')
 def home():
     """Página inicial redireciona para o admin."""
     return redirect(url_for('cadastro_ecc.home'))
+
+
 
 # ============================================================================
 # CONTEXTO GLOBAL PARA TEMPLATES
@@ -457,12 +460,22 @@ def inject_globals():
 
 
 
+
+
+
+
 ecc_bp = Blueprint(
     "cadastro_ecc",
     __name__,
     url_prefix='/cadastro_ecc'
 )
-@ecc_bp.route('/asd')
+@ecc_bp.route('/')
 def home():
+    return redirect(url_for('cadastro_ecc.login'))
     
     return "asd asd asd"
+
+@ecc_bp.route('/login')
+def login():
+    
+    return render_template('ecc/login.html')

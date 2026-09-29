@@ -1,0 +1,75 @@
+    <!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Ecc{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="{{ url_for('main.admin_dashboard') }}">
+                <i class="fas fa-cube"></i>
+                <span>Ecc</span>
+            </a>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('main.admin_dashboard') }}" class="{% if request.endpoint == 'main.admin_dashboard' %}active{% endif %}">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="{{ url_for('main.admin_listar_objetos') }}" class="{% if request.endpoint and request.endpoint.startswith('main.admin_listar_objetos') %}active{% endif %}">
+                <i class="fas fa-layer-group"></i> Objetos
+            </a>
+            <div class="dropdown">
+                <button class="dropbtn">
+                    <i class="fas fa-database"></i> Dados <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="dropdown-content">
+                    {% for obj in object_definitions %}
+                    <a href="{{ dynamic_url('index', obj.slug) }}">
+                        <i class="fas fa-table"></i> {{ obj.plural_name }}
+                    </a>
+                    {% endfor %}
+                    {% if not object_definitions %}
+                    <span class="dropdown-empty">Nenhum objeto criado</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">
+                            <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                            {{ message }}
+                            <button class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>Dynamic CRUD Generator - Flask + PyMongo</p>
+    </footer>
+
+    <script>
+        // Auto-dismiss flash messages after 5 seconds
+        document.querySelectorAll('.flash').forEach(function(flash) {
+            setTimeout(function() {
+                flash.style.opacity = '0';
+                setTimeout(function() { flash.remove(); }, 300);
+            }, 5000);
+        });
+    </script>
+</body>
+</html>
